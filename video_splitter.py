@@ -116,8 +116,7 @@ def build_gui():
     input_path1, output_path1, info1 = tk.StringVar(), tk.StringVar(), tk.StringVar()
     start_time, end_time = [tk.StringVar(value="00:00:00") for _ in range(2)]
 
-    def choose_file1():
-        path = filedialog.askopenfilename()
+    def set_input1(path):
         if path:
             input_path1.set(path)
             dur, codec, _ = get_video_info(path)
@@ -125,10 +124,15 @@ def build_gui():
             name, ext = os.path.splitext(os.path.basename(path))
             output_path1.set(os.path.join(os.path.dirname(path), f"{name}_1{ext}"))
 
+    def choose_file1():
+        path = filedialog.askopenfilename()
+        set_input1(path)
+
     def choose_output1():
-        path = filedialog.asksaveasfilename(defaultextension=".mp4")
-        if path:
-            output_path1.set(path)
+        folder = filedialog.askdirectory()
+        if folder and input_path1.get():
+            name, ext = os.path.splitext(os.path.basename(input_path1.get()))
+            output_path1.set(os.path.join(folder, f"{name}_1{ext}"))
 
     def run_split():
         split_video(input_path1.get(), start_time.get(), end_time.get(), output_path1.get(),
@@ -138,14 +142,14 @@ def build_gui():
     tk.Entry(tab1, textvariable=input_path1, width=60).grid(row=0, column=1, padx=5, pady=5)
     tk.Button(tab1, text="浏览", command=choose_file1).grid(row=0, column=2, padx=5, pady=5)
     tab1.drop_target_register(DND_FILES)
-    tab1.dnd_bind('<<Drop>>', lambda e: (input_path1.set(e.data), choose_file1()))
+    tab1.dnd_bind('<<Drop>>', lambda e: set_input1(e.data.strip('{}')))
 
     tk.Label(tab1, textvariable=info1).grid(row=1, column=0, columnspan=3, padx=5)
 
-    ttk.Label(tab1, text="开始时间：").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+    ttk.Label(tab1, text="时间范围：").grid(row=2, column=0, padx=5, pady=5, sticky="e")
     tk.Entry(tab1, textvariable=start_time, width=10).grid(row=2, column=1, sticky="w")
-    ttk.Label(tab1, text="结束时间：").grid(row=2, column=1, padx=90, pady=5, sticky="w")
-    tk.Entry(tab1, textvariable=end_time, width=10).grid(row=2, column=1, padx=180, sticky="w")
+    ttk.Label(tab1, text="至").grid(row=2, column=1, padx=100, sticky="w")
+    tk.Entry(tab1, textvariable=end_time, width=10).grid(row=2, column=1, padx=130, sticky="w")
 
     ttk.Label(tab1, text="输出路径：").grid(row=3, column=0, padx=5, pady=5, sticky="e")
     tk.Entry(tab1, textvariable=output_path1, width=60).grid(row=3, column=1, padx=5, pady=5)
