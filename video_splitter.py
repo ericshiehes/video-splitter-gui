@@ -104,7 +104,7 @@ def extract_audio(input_file, output_file, callback):
 def build_gui():
     root = TkinterDnD.Tk()
     root.title("FFmpeg 视频工具箱")
-    root.geometry("660x380")
+    root.geometry("700x420")
     load_config()
     show_path_warning()
 
@@ -125,18 +125,33 @@ def build_gui():
             name, ext = os.path.splitext(os.path.basename(path))
             output_path1.set(os.path.join(os.path.dirname(path), f"{name}_1{ext}"))
 
+    def choose_output1():
+        path = filedialog.asksaveasfilename(defaultextension=".mp4")
+        if path:
+            output_path1.set(path)
+
     def run_split():
         split_video(input_path1.get(), start_time.get(), end_time.get(), output_path1.get(),
                     lambda ok: messagebox.showinfo("成功" if ok else "失败", "分割完成" if ok else "分割失败"))
 
-    tk.Button(tab1, text="选择文件", command=choose_file1).pack()
-    tk.Label(tab1, textvariable=info1).pack()
-    tk.Label(tab1, text="开始时间").pack()
-    tk.Entry(tab1, textvariable=start_time, width=10).pack()
-    tk.Label(tab1, text="结束时间").pack()
-    tk.Entry(tab1, textvariable=end_time, width=10).pack()
-    tk.Entry(tab1, textvariable=output_path1, width=50).pack()
-    tk.Button(tab1, text="分割", command=run_split).pack(pady=5)
+    ttk.Label(tab1, text="选择文件：").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab1, textvariable=input_path1, width=60).grid(row=0, column=1, padx=5, pady=5)
+    tk.Button(tab1, text="浏览", command=choose_file1).grid(row=0, column=2, padx=5, pady=5)
+    tab1.drop_target_register(DND_FILES)
+    tab1.dnd_bind('<<Drop>>', lambda e: (input_path1.set(e.data), choose_file1()))
+
+    tk.Label(tab1, textvariable=info1).grid(row=1, column=0, columnspan=3, padx=5)
+
+    ttk.Label(tab1, text="开始时间：").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab1, textvariable=start_time, width=10).grid(row=2, column=1, sticky="w")
+    ttk.Label(tab1, text="结束时间：").grid(row=2, column=1, padx=90, pady=5, sticky="w")
+    tk.Entry(tab1, textvariable=end_time, width=10).grid(row=2, column=1, padx=180, sticky="w")
+
+    ttk.Label(tab1, text="输出路径：").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab1, textvariable=output_path1, width=60).grid(row=3, column=1, padx=5, pady=5)
+    tk.Button(tab1, text="选择", command=choose_output1).grid(row=3, column=2, padx=5, pady=5)
+
+    tk.Button(tab1, text="分割", command=run_split).grid(row=4, column=1, pady=10)
     notebook.add(tab1, text="视频分割")
 
     # ---------- tab2 等分 ----------
@@ -155,11 +170,17 @@ def build_gui():
         split_equally(input_path2.get(), part_num.get(), name,
                       lambda ok: messagebox.showinfo("成功" if ok else "失败", "分割完成" if ok else "分割失败"))
 
-    tk.Button(tab2, text="选择文件", command=choose_file2).pack()
-    tk.Label(tab2, textvariable=info2).pack()
-    tk.Label(tab2, text="等分为：").pack()
-    tk.Entry(tab2, textvariable=part_num, width=5).pack()
-    tk.Button(tab2, text="确定分割", command=run_equal).pack(pady=5)
+    ttk.Label(tab2, text="选择文件：").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab2, textvariable=input_path2, width=60).grid(row=0, column=1, padx=5, pady=5)
+    tk.Button(tab2, text="浏览", command=choose_file2).grid(row=0, column=2, padx=5, pady=5)
+    tab2.drop_target_register(DND_FILES)
+    tab2.dnd_bind('<<Drop>>', lambda e: (input_path2.set(e.data), choose_file2()))
+
+    tk.Label(tab2, textvariable=info2).grid(row=1, column=0, columnspan=3, padx=5)
+
+    tk.Label(tab2, text="等分为：").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab2, textvariable=part_num, width=5).grid(row=2, column=1, sticky="w")
+    tk.Button(tab2, text="确定分割", command=run_equal).grid(row=3, column=1, pady=10)
     notebook.add(tab2, text="视频等分")
 
     # ---------- tab3 提取音频 ----------
@@ -176,9 +197,13 @@ def build_gui():
         extract_audio(input_path3.get(), name + ".mp3",
                       lambda ok: messagebox.showinfo("成功" if ok else "失败", "提取成功" if ok else "失败"))
 
-    tk.Button(tab3, text="选择视频", command=choose_file3).pack()
-    tk.Entry(tab3, textvariable=input_path3, width=60).pack()
-    tk.Button(tab3, text="提取 MP3", command=run_audio).pack(pady=5)
+    ttk.Label(tab3, text="选择文件：").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    tk.Entry(tab3, textvariable=input_path3, width=60).grid(row=0, column=1, padx=5, pady=5)
+    tk.Button(tab3, text="浏览", command=choose_file3).grid(row=0, column=2, padx=5, pady=5)
+    tab3.drop_target_register(DND_FILES)
+    tab3.dnd_bind('<<Drop>>', lambda e: (input_path3.set(e.data), choose_file3()))
+
+    tk.Button(tab3, text="提取 MP3", command=run_audio).grid(row=1, column=1, pady=10)
     notebook.add(tab3, text="提取音频")
 
     root.mainloop()
