@@ -3,155 +3,185 @@ from tkinter import filedialog, messagebox, ttk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import subprocess
 import os
-import json
 import threading
+import json
 
+CONFIG = {"suppress_path_warning": False}
 CONFIG_FILE = "config.json"
 
+# 加载配置
 def load_config():
+    global CONFIG
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                CONFIG = json.load(f)
+        except:
+            CONFIG = {"suppress_path_warning": False}
 
-def save_config(config):
+# 保存配置
+def save_config():
     with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f)
+        json.dump(CONFIG, f)
 
+# 启动提示
 def show_path_warning():
-    config = load_config()
-    if not config.get("suppress_path_warning", False):
-        def on_ok():
-            if var.get():
-                config["suppress_path_warning"] = True
-                save_config(config)
-            popup.destroy()
-
+    if not CONFIG.get("suppress_path_warning", False):
         popup = tk.Toplevel()
         popup.title("提示")
-        tk.Label(popup, text="请确保 ffmpeg 的 bin 目录已加入系统 Path 环境变量！").pack(pady=10)
+        popup.geometry("360x120+500+300")
+        popup.attributes("-topmost", True)
+        tk.Label(popup, text="请确保 ffmpeg/bin 已加入系统 Path!").pack(pady=10)
         var = tk.BooleanVar()
-        tk.Checkbutton(popup, text="不再显示此提示", variable=var).pack()
-        tk.Button(popup, text="确定", command=on_ok).pack(pady=10)
+        tk.Checkbutton(popup, text="不再显示", variable=var).pack()
+        def on_ok():
+            if var.get():
+                CONFIG["suppress_path_warning"] = True
+                save_config()
+            popup.destroy()
+        tk.Button(popup, text="确定", command=on_ok).pack(pady=5)
         popup.grab_set()
 
-def select_file():
-    file_path = filedialog.askopenfilename(filetypes=[("视频文件", "*.mp4;*.mov;*.mkv;*.avi")])
-    if file_path:
-        handle_file_select(file_path)
-
-def handle_file_select(file_path):
-    input_path.set(file_path)
-    get_video_info(file_path)
-    update_output_path(file_path)
-
-def get_video_info(file_path):
+# 解析视频信息
+def get_video_info(filepath):
     try:
-        cmd = ["ffmpeg", "-i", file_path]
-        result = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-        output = result.stderr
-        duration = ""
-        codec = ""
-        for line in output.splitlines():
+        result = subprocess.run(["ffmpeg", "-i", filepath], stderr=subprocess.PIPE, text=True)
+        lines = result.stderr.splitlines()
+        duration, codec, size = "", "", os.path.getsize(filepath) / 1024 / 1024
+        for line in lines:
             if "Duration" in line:
-                duration = line.strip().split(",")[0].split("Duration:")[1].strip()
+                duration = line.split("Duration:")[1].split(",")[0].strip()
             if "Stream" in line and "Video" in line:
-                codec = line.split(":")[2].split(",")[0].strip()
+                codec = line.split(":")[-1].split(",")[0].strip()
                 break
-        video_info.set(f"编码: {codec}   时长: {duration}")
-    except Exception as e:
-        messagebox.showerror("错误", f"获取视频信息失败：{e}")
+        return duration, codec, f"{size:.2f} MB"
+    except:
+        return "", "", ""
 
-def update_output_path(file_path):
-    base = os.path.splitext(file_path)[0]
-    folder = base + "_1"
-    os.makedirs(folder, exist_ok=True)
-    filename = os.path.basename(file_path)
-    name, ext = os.path.splitext(filename)
-    output_file = os.path.join(folder, f"{name}_split{ext}")
-    output_path.set(output_file)
-
-def run_ffmpeg():
-    in_file = input_path.get()
-    start_time = start_entry.get()
-    end_time = end_entry.get()
-    out_file = output_path.get()
-
-    if not in_file or not start_time or not end_time or not out_file:
-        messagebox.showwarning("警告", "所有字段都必须填写！")
-        return
-
-    progress_bar["value"] = 0
-    progress_bar.update()
-
+# 分割功能
+def split_video(input_file, start, end, output_file, callback):
     def task():
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", in_file,
-            "-ss", start_time,
-            "-to", end_time,
-            "-c", "copy", out_file
-        ]
         try:
-            # 模拟进度条（实际根据文件大小估计时间较困难）
-            for i in range(1, 101):
-                progress_bar["value"] = i
-                progress_bar.update()
-                root.after(20)
-
-            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-            progress_bar["value"] = 100
-            messagebox.showinfo("完成", "视频分割完成！")
-        except subprocess.CalledProcessError as e:
-            messagebox.showerror("错误", f"执行分割失败：{e}")
-        finally:
-            progress_bar["value"] = 0
-
+            subprocess.run(["ffmpeg", "-y", "-i", input_file, "-ss", start, "-to", end, "-c", "copy", output_file],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            callback(True)
+        except:
+            callback(False)
     threading.Thread(target=task).start()
 
-# 初始化窗口
-root = TkinterDnD.Tk()
-root.title("视频分割工具")
-root.geometry("620x330")
+# 等分功能
+def split_equally(input_file, parts, output_prefix, callback):
+    def task():
+        try:
+            result = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                                     "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_file],
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            total_duration = float(result.stdout.strip())
+            each = total_duration / parts
+            for i in range(parts):
+                ss = str(int(each * i))
+                to = str(int(each * (i + 1)))
+                out = f"{output_prefix}_{i + 1}.mp4"
+                subprocess.run(["ffmpeg", "-y", "-i", input_file, "-ss", ss, "-to", to, "-c", "copy", out],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            callback(True)
+        except:
+            callback(False)
+    threading.Thread(target=task).start()
 
-show_path_warning()
+# 音频提取
+def extract_audio(input_file, output_file, callback):
+    def task():
+        try:
+            subprocess.run(["ffmpeg", "-y", "-i", input_file, "-q:a", "0", "-map", "a", output_file],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            callback(True)
+        except:
+            callback(False)
+    threading.Thread(target=task).start()
 
-# 变量
-input_path = tk.StringVar()
-video_info = tk.StringVar()
-output_path = tk.StringVar()
+# 构建 UI
+def build_gui():
+    root = TkinterDnD.Tk()
+    root.title("FFmpeg 视频工具箱")
+    root.geometry("660x380")
+    load_config()
+    show_path_warning()
 
-# 文件选择
-tk.Label(root, text="选择视频文件:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
-entry = tk.Entry(root, textvariable=input_path, width=50)
-entry.grid(row=0, column=1)
-entry.drop_target_register(DND_FILES)
-entry.dnd_bind('<<Drop>>', lambda e: handle_file_select(e.data.strip('{}')))
-tk.Button(root, text="选择", command=select_file).grid(row=0, column=2, padx=5)
+    notebook = ttk.Notebook(root)
+    notebook.pack(fill="both", expand=True)
 
-# 视频信息
-tk.Label(root, textvariable=video_info).grid(row=1, column=0, columnspan=3, padx=10, pady=5, sticky="w")
+    # ---------- tab1 视频分割 ----------
+    tab1 = ttk.Frame(notebook)
+    input_path1, output_path1, info1 = tk.StringVar(), tk.StringVar(), tk.StringVar()
+    start_time, end_time = [tk.StringVar(value="00:00:00") for _ in range(2)]
 
-# 时间输入
-tk.Label(root, text="开始时间(HH:MM:SS):").grid(row=2, column=0, padx=10, pady=5, sticky="e")
-start_entry = tk.Entry(root)
-start_entry.grid(row=2, column=1, sticky="w")
+    def choose_file1():
+        path = filedialog.askopenfilename()
+        if path:
+            input_path1.set(path)
+            dur, codec, _ = get_video_info(path)
+            info1.set(f"{codec} | 时长: {dur}")
+            name, ext = os.path.splitext(os.path.basename(path))
+            output_path1.set(os.path.join(os.path.dirname(path), f"{name}_1{ext}"))
 
-tk.Label(root, text="结束时间(HH:MM:SS):").grid(row=3, column=0, padx=10, pady=5, sticky="e")
-end_entry = tk.Entry(root)
-end_entry.grid(row=3, column=1, sticky="w")
+    def run_split():
+        split_video(input_path1.get(), start_time.get(), end_time.get(), output_path1.get(),
+                    lambda ok: messagebox.showinfo("成功" if ok else "失败", "分割完成" if ok else "分割失败"))
 
-# 输出路径
-tk.Label(root, text="输出文件路径:").grid(row=4, column=0, padx=10, pady=5, sticky="e")
-tk.Entry(root, textvariable=output_path, width=50).grid(row=4, column=1)
-tk.Button(root, text="浏览", command=lambda: output_path.set(filedialog.asksaveasfilename())).grid(row=4, column=2, padx=5)
+    tk.Button(tab1, text="选择文件", command=choose_file1).pack()
+    tk.Label(tab1, textvariable=info1).pack()
+    tk.Label(tab1, text="开始时间").pack()
+    tk.Entry(tab1, textvariable=start_time, width=10).pack()
+    tk.Label(tab1, text="结束时间").pack()
+    tk.Entry(tab1, textvariable=end_time, width=10).pack()
+    tk.Entry(tab1, textvariable=output_path1, width=50).pack()
+    tk.Button(tab1, text="分割", command=run_split).pack(pady=5)
+    notebook.add(tab1, text="视频分割")
 
-# 进度条
-progress_bar = ttk.Progressbar(root, length=500, mode='determinate')
-progress_bar.grid(row=5, column=0, columnspan=3, pady=10)
+    # ---------- tab2 等分 ----------
+    tab2 = ttk.Frame(notebook)
+    input_path2, info2, part_num = tk.StringVar(), tk.StringVar(), tk.IntVar(value=2)
 
-# 操作按钮
-tk.Button(root, text="确定", command=run_ffmpeg).grid(row=6, column=1, sticky="e", pady=20)
-tk.Button(root, text="退出", command=root.quit).grid(row=6, column=2, padx=5, pady=20)
+    def choose_file2():
+        path = filedialog.askopenfilename()
+        if path:
+            input_path2.set(path)
+            dur, codec, size = get_video_info(path)
+            info2.set(f"{codec} | 时长: {dur} | 大小: {size}")
 
-root.mainloop()
+    def run_equal():
+        name, _ = os.path.splitext(input_path2.get())
+        split_equally(input_path2.get(), part_num.get(), name,
+                      lambda ok: messagebox.showinfo("成功" if ok else "失败", "分割完成" if ok else "分割失败"))
+
+    tk.Button(tab2, text="选择文件", command=choose_file2).pack()
+    tk.Label(tab2, textvariable=info2).pack()
+    tk.Label(tab2, text="等分为：").pack()
+    tk.Entry(tab2, textvariable=part_num, width=5).pack()
+    tk.Button(tab2, text="确定分割", command=run_equal).pack(pady=5)
+    notebook.add(tab2, text="视频等分")
+
+    # ---------- tab3 提取音频 ----------
+    tab3 = ttk.Frame(notebook)
+    input_path3 = tk.StringVar()
+
+    def choose_file3():
+        path = filedialog.askopenfilename()
+        if path:
+            input_path3.set(path)
+
+    def run_audio():
+        name, _ = os.path.splitext(input_path3.get())
+        extract_audio(input_path3.get(), name + ".mp3",
+                      lambda ok: messagebox.showinfo("成功" if ok else "失败", "提取成功" if ok else "失败"))
+
+    tk.Button(tab3, text="选择视频", command=choose_file3).pack()
+    tk.Entry(tab3, textvariable=input_path3, width=60).pack()
+    tk.Button(tab3, text="提取 MP3", command=run_audio).pack(pady=5)
+    notebook.add(tab3, text="提取音频")
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    build_gui()

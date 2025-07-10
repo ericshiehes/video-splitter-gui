@@ -1,26 +1,32 @@
-# 🎬 视频分割工具（FFmpeg GUI）
+# 🎬 视频工具箱 v2（FFmpeg GUI）
 
-一个基于 Python + tkinter 的 Windows 视频分割工具，支持：
-- 拖拽视频文件
-- 设置分割时间
-- 自动生成输出路径
-- 显示视频编码与时长信息
-- 一键执行分割
-- 简洁易用、纯绿色程序
+新版功能：
+- ✅ 视频分割（自定义开始/结束时间，自动命名）
+- ✅ 视频等分（如2等分、3等分）
+- ✅ 提取视频音频为 MP3 格式
+- ✅ 拖拽支持
+- ✅ 自动分析视频信息（时长、编码、大小）
+- ✅ 界面优化，支持 Tab 标签页切换
 
-## 📦 安装依赖
+---
+
+## 🖥️ 使用方法
 
 ```bash
 pip install -r requirements.txt
-```
-
-## ▶️ 运行程序
-
-```bash
 python video_splitter.py
 ```
 
-## 📦 打包为 .exe
+---
+
+## 📝 依赖库
+
+- tkinter（标准库）
+- tkinterdnd2
+
+---
+
+## 🧩 打包 EXE（可选）
 
 ```bash
 pip install pyinstaller
