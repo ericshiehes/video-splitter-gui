@@ -24,25 +24,17 @@ python video_splitter.py
 - tkinter（标准库）
 - tkinterdnd2
 
----
-✅ 图标嵌入方式
-你下载的图标请保存为 icon.ico，与 .py 文件放在同一目录中，程序会通过以下代码自动加载图标：
-
-```python
-root.iconbitmap("icon.ico")
-```
 
 ## 🧩 打包 EXE（可选）
 
-如需将程序打包为 .exe 并包含图标，请运行以下命令（需先安装 pyinstaller）：
+如需将程序打包为 .exe ，请运行以下命令（需先安装 pyinstaller）：
 
 ```bash
 pip install pyinstaller
-pyinstaller -F -w -i icon.ico video_splitter.py
+pyinstaller -F -w video_splitter.py
 ```
 其中：
 -F：生成单一 .exe 文件
 -w：不显示命令行窗口（适合 GUI）
--i icon.ico：设置程序图标
 
 MIT License © 2025
