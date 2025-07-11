@@ -116,7 +116,6 @@ def build_gui():
     root = TkinterDnD.Tk()
     root.title("FFmpeg 视频工具箱")
     center_window(root, 600, 300)
-    root.iconbitmap("icon.ico")  # 设置程序图标，请将图标文件命名为 icon.ico 并放在同一目录
     load_config()
     show_path_warning(root)
 
