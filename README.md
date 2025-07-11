@@ -38,7 +38,7 @@ root.iconbitmap("icon.ico")
 
 ```bash
 pip install pyinstaller
-pyinstaller -F -w -i icon.ico your_script.py
+pyinstaller -F -w -i icon.ico video_splitter.py
 ```
 其中：
 -F：生成单一 .exe 文件
